@@ -1,6 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/authContext';
+import api from '../api/axios';
+
 import {
   Container,
   Box,
@@ -13,6 +15,7 @@ import {
   Divider,
   Alert,
 } from '@mui/material';
+
 import {
   Visibility,
   VisibilityOff,
@@ -25,38 +28,54 @@ import {
 export default function Login() {
   const navigate = useNavigate();
   const { login } = useAuth();
+
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+
   const [formData, setFormData] = useState({
     email: '',
     password: '',
   });
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    setError('');
-
-    // Mock login - In production, this would call your API
-    if (formData.email && formData.password) {
-      const mockUser = {
-        id: 1,
-        name: 'John Doe',
-        email: formData.email,
-        role: 'admin', // Can be: community, chw, treatment_provider, programme_manager, admin
-        district: 'Central District',
-      };
-      login(mockUser);
+  // Redirect if already logged in
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    if (token) {
       navigate('/dashboard');
-    } else {
-      setError('Please enter valid credentials');
     }
-  };
+  }, [navigate]);
 
   const handleChange = (e) => {
     setFormData({
       ...formData,
       [e.target.name]: e.target.value,
     });
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
+
+    try {
+      const response = await api.post('auth/login.php', {
+        email: formData.email,
+        password: formData.password,
+      }); 
+      if (response.data.success) {
+        localStorage.setItem('token', response.data.token);
+        login(response.data.user);
+        navigate('/dashboard');
+      } else {
+        setError(response.data.message || 'Invalid credentials');
+      }
+    } catch (err) {
+      console.error(err);
+      setError('Server error. Please try again.');
+    }
+
+    setLoading(false);
   };
 
   return (
@@ -76,7 +95,6 @@ export default function Login() {
           sx={{
             p: 4,
             borderRadius: 3,
-            backdropFilter: 'blur(10px)',
           }}
         >
           <Box sx={{ textAlign: 'center', mb: 3 }}>
@@ -158,17 +176,19 @@ export default function Login() {
               fullWidth
               variant="contained"
               size="large"
+              disabled={loading}
               sx={{
                 mt: 2,
                 mb: 2,
                 py: 1.5,
                 background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
                 '&:hover': {
-                  background: 'linear-gradient(135deg, #5568d3 0%, #6a4293 100%)',
+                  background:
+                    'linear-gradient(135deg, #5568d3 0%, #6a4293 100%)',
                 },
               }}
             >
-              Sign In
+              {loading ? 'Signing In...' : 'Sign In'}
             </Button>
 
             <Divider sx={{ my: 2 }}>
@@ -182,7 +202,6 @@ export default function Login() {
                 fullWidth
                 variant="outlined"
                 startIcon={<Google />}
-                onClick={() => console.log('Google login')}
               >
                 Google
               </Button>
@@ -190,7 +209,6 @@ export default function Login() {
                 fullWidth
                 variant="outlined"
                 startIcon={<GitHub />}
-                onClick={() => console.log('GitHub login')}
               >
                 GitHub
               </Button>
@@ -200,7 +218,11 @@ export default function Login() {
               Don't have an account?{' '}
               <Link
                 to="/register"
-                style={{ textDecoration: 'none', color: '#667eea', fontWeight: 600 }}
+                style={{
+                  textDecoration: 'none',
+                  color: '#667eea',
+                  fontWeight: 600,
+                }}
               >
                 Sign Up
               </Link>
