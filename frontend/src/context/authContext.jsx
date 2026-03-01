@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useEffect } from "react";
+import api from "../api/axios";
 
 const AuthContext = createContext(null);
 
@@ -15,34 +16,41 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Check if user is logged in (check localStorage)
     const storedUser = localStorage.getItem("user");
+
     if (storedUser) {
-      setUser(JSON.parse(storedUser));
+      const parsedUser = JSON.parse(storedUser);
+      setUser(parsedUser);
+
+      // Attach token automatically
+      api.defaults.headers.common[
+        "Authorization"
+      ] = `Bearer ${parsedUser.token}`;
     }
+
     setLoading(false);
   }, []);
 
-  const login = (userData) => {
+  const login = ({ id, role, token }) => {
+    const userData = { id, role, token };
+
     setUser(userData);
     localStorage.setItem("user", JSON.stringify(userData));
+
+    // Attach token to all future requests
+    api.defaults.headers.common["Authorization"] = `Bearer ${token}`;
   };
 
   const logout = () => {
     setUser(null);
     localStorage.removeItem("user");
-  };
-
-  const register = (userData) => {
-    setUser(userData);
-    localStorage.setItem("user", JSON.stringify(userData));
+    delete api.defaults.headers.common["Authorization"];
   };
 
   const value = {
     user,
     login,
     logout,
-    register,
     loading,
     isAuthenticated: !!user,
   };
